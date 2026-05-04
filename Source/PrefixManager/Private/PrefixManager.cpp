@@ -152,7 +152,7 @@ void FPrefixManagerModule::HandleOnNewAssetCreated(UFactory* Factory)
                }
                
                return false;
-           }), 0.01f); 
+           }), EditorSettings->AutoPrefixDelay); 
        }
     }
 }

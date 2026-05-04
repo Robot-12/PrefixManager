@@ -7,8 +7,3 @@ UPrefixSettingsEditor::UPrefixSettingsEditor(const FObjectInitializer& Initializ
 	CategoryName = TEXT("Plugins");
 	SectionName = TEXT("Prefix Manager (User)");
 }
-
-FName UPrefixSettingsEditor::GetContainerName() const
-{
-	return FName("Editor");
-}
