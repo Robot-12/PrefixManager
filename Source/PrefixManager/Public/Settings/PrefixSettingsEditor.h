@@ -6,13 +6,15 @@
 #include "Engine/DeveloperSettings.h"
 #include "PrefixSettingsEditor.generated.h"
 
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnValidationStateChanged, bool);
+
 UCLASS(config=EditorSettings, meta=(DisplayName="Prefix Settings"))
 class PREFIXMANAGER_API UPrefixSettingsEditor : public UDeveloperSettings
 {
 	GENERATED_BODY()
 
 	explicit UPrefixSettingsEditor(const FObjectInitializer& InitializerModule);
-	
+    
 public:
 	// User toggle to locally disable the Editor subsystem hook for asset creation.
 	UPROPERTY(Config, EditAnywhere, Category = "AutoPrefix", meta = (ToolTip = "Determines whether the automatic prefixing feature is enabled for your local Editor."))
@@ -21,4 +23,14 @@ public:
 	// Slate UI injection delay. Requires tweaking on slower machines where SEditableText takes longer to focus.
 	UPROPERTY(Config, EditAnywhere, Category = "AutoPrefix", meta = (ClampMin = "0.01", ClampMax = "1.0", ToolTip = "The delay (in seconds) before the auto-prefixer attempts to inject the text into the creation field. Increase this if the prefix doesn't appear."))
 	float AutoPrefixDelay = 0.1f;
+
+	// VALIDATION TOGGLE: Disables local error checking when writing files.
+	UPROPERTY(Config, EditAnywhere, Category = "Validation", meta = (ToolTip = "Determines whether the Data Validation rules are enforced when saving assets."))
+	bool bEnableValidation = true;
+
+	FOnValidationStateChanged OnValidationStateChangedEvent;
+	
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
 };

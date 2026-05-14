@@ -130,3 +130,44 @@ void UPrefixSettingsProject::ResetToDefaults()
 
 	SaveConfig();
 }
+
+const FPrefixClass* UPrefixSettingsProject::GetRuleForClass(const UClass* TargetClass, const UClass* BaseClassType) const
+{
+	const FPrefixClass* MatchedPrefixData = nullptr;
+	const UClass* CurrentClass = TargetClass;
+	bool bIsExactClass = true;
+
+	while (CurrentClass)
+	{
+		for (const FPrefixClass& PrefixClass : Prefixes)
+		{
+			if (PrefixClass.AssetClass == CurrentClass)
+			{
+				if (bIsExactClass || PrefixClass.bApplyToChildren)
+				{
+					MatchedPrefixData = &PrefixClass;
+					break;
+				}
+			}
+		}
+            
+		if (MatchedPrefixData) break;
+                
+		CurrentClass = CurrentClass->GetSuperClass();
+		bIsExactClass = false;
+	}
+
+	if (!MatchedPrefixData && BaseClassType)
+	{
+		for (const FPrefixClass& PrefixClass : Prefixes)
+		{
+			if (PrefixClass.AssetClass == BaseClassType)
+			{
+				MatchedPrefixData = &PrefixClass;
+				break;
+			}
+		}
+	}
+
+	return MatchedPrefixData;
+}

@@ -62,49 +62,9 @@ void FPrefixManagerModule::HandleOnNewAssetCreated(UFactory* Factory)
         }
     }
     
-    const FString ClassName = AssetClass->GetName();
-    
     if (const UPrefixSettingsProject* ProjectSettings = GetDefault<UPrefixSettingsProject>())
     {
-        const FPrefixClass* MatchedPrefixData = nullptr;
-        
-        const UClass* CurrentClass = AssetClass;
-        bool bIsExactClass = true;
-        
-        while (CurrentClass)
-        {
-            for (const FPrefixClass& PrefixClass : ProjectSettings->Prefixes)
-            {
-                if (PrefixClass.AssetClass == CurrentClass)
-                {
-                    if (bIsExactClass || PrefixClass.bApplyToChildren)
-                    {
-                        MatchedPrefixData = &PrefixClass;
-                        break;
-                    }
-                }
-            }
-            
-            if (MatchedPrefixData)
-            {
-                break;
-            }
-                
-            CurrentClass = CurrentClass->GetSuperClass();
-            bIsExactClass = false;
-        }
-        
-        if (!MatchedPrefixData)
-        {
-            for (const FPrefixClass& PrefixClass : ProjectSettings->Prefixes)
-            {
-                if (PrefixClass.AssetClass == ClassType)
-                {
-                    MatchedPrefixData = &PrefixClass;
-                    break;
-                }
-            }
-        }
+        const FPrefixClass* MatchedPrefixData = ProjectSettings->GetRuleForClass(AssetClass, ClassType);
 
        if (MatchedPrefixData)
        {

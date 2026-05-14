@@ -44,7 +44,8 @@ public class PrefixManager : ModuleRules
 				"UMG",
 				"PhysicsCore",
 				"AIModule",
-				"UMGEditor"
+				"UMGEditor",
+				"DataValidation"
 			}
 			);
 		
