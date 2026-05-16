@@ -6,7 +6,7 @@
 #include "WidgetBlueprint.h"
 #include "Settings/PrefixSettingsEditor.h"
 
-#define LOCTEXT_NAMESPACE "PrefixSettingsPlugin"
+#define LOCTEXT_NAMESPACE "PrefixManagerPlugin"
 
 UPrefixValidator::UPrefixValidator()
 {
@@ -58,74 +58,61 @@ bool UPrefixValidator::CanValidateAsset_Implementation(const FAssetData& InAsset
 
 EDataValidationResult UPrefixValidator::ValidateLoadedAsset_Implementation(const FAssetData& InAssetData, UObject* InAsset, FDataValidationContext& InContext)
 {
-	if (!InAsset) return EDataValidationResult::NotValidated;
+    if (!InAsset) return EDataValidationResult::NotValidated;
 
-	const UPrefixSettingsProject* ProjectSettings = GetDefault<UPrefixSettingsProject>();
-	if (!ProjectSettings || ProjectSettings->Prefixes.IsEmpty()) 
-	{
-		return EDataValidationResult::NotValidated;
-	}
+    const UPrefixSettingsProject* ProjectSettings = GetDefault<UPrefixSettingsProject>();
+    if (!ProjectSettings || ProjectSettings->Prefixes.IsEmpty()) 
+    {
+       return EDataValidationResult::NotValidated;
+    }
+	
+    const UClass* AssetClass = nullptr;
+    const UClass* ClassType = nullptr;
+    UPrefixSettingsProject::ResolveAssetClassAndType(InAsset, InAsset->GetClass(), AssetClass, ClassType);
 
-	const UClass* AssetClass = InAsset->GetClass();
-	const UClass* ClassType = InAsset->GetClass();
+    const FPrefixClass* MatchedPrefixData = ProjectSettings->GetRuleForClass(AssetClass, ClassType);
 
-	if (const UBlueprint* BP = Cast<UBlueprint>(InAsset))
-	{
-		if (BP->ParentClass != nullptr)
-		{
-			AssetClass = BP->ParentClass;
-		}
-	}
+    if (!MatchedPrefixData)
+    {
+       AssetPasses(InAsset);
+       return EDataValidationResult::Valid;
+    }
 
-	if (ClassType->IsChildOf(UWidgetBlueprint::StaticClass()))
-	{
-		ClassType = UWidgetBlueprint::StaticClass();
-	}
+    const FString AssetName = InAsset->GetName();
+    const bool bValidPrefix = MatchedPrefixData->Prefix.IsEmpty() || AssetName.StartsWith(MatchedPrefixData->Prefix);
+    const bool bValidSuffix = MatchedPrefixData->Suffix.IsEmpty() || AssetName.EndsWith(MatchedPrefixData->Suffix);
 
-	const FPrefixClass* MatchedPrefixData = ProjectSettings->GetRuleForClass(AssetClass, ClassType);
+    if (!bValidPrefix || !bValidSuffix)
+    {
+       FText ErrorMsg = FText::Format(
+          LOCTEXT("InvalidNameError", "Name '{0}' is invalid for class {1}."),
+          FText::FromString(AssetName),
+          FText::FromString(ClassType->GetName())
+       );
 
-	if (!MatchedPrefixData)
-	{
-		AssetPasses(InAsset);
-		return EDataValidationResult::Valid;
-	}
+       if (!bValidPrefix)
+       {
+          const FText PrefixError = FText::Format(
+             LOCTEXT("MissingPrefixError", "Required prefix: '{0}'."),
+             FText::FromString(MatchedPrefixData->Prefix)
+          );
+          ErrorMsg = FText::Join(FText::FromString(TEXT(" ")), ErrorMsg, PrefixError);
+       }
 
-	const FString AssetName = InAsset->GetName();
-	const bool bValidPrefix = MatchedPrefixData->Prefix.IsEmpty() || AssetName.StartsWith(MatchedPrefixData->Prefix);
-	const bool bValidSuffix = MatchedPrefixData->Suffix.IsEmpty() || AssetName.EndsWith(MatchedPrefixData->Suffix);
+       if (!bValidSuffix)
+       {
+          const FText SuffixError = FText::Format(
+             LOCTEXT("MissingSuffixError", "Required suffix: '{0}'."),
+             FText::FromString(MatchedPrefixData->Suffix)
+          );
+          ErrorMsg = FText::Join(FText::FromString(TEXT(" ")), ErrorMsg, SuffixError);
+       }
 
-	if (!bValidPrefix || !bValidSuffix)
-	{
-		FText ErrorMsg = FText::Format(
-			LOCTEXT("InvalidNameError", "Name '{0}' is invalid for class {1}."),
-			FText::FromString(AssetName),
-			FText::FromString(ClassType->GetName())
-		);
+       AssetFails(InAsset, ErrorMsg);
+       return EDataValidationResult::Invalid;
+    }
 
-		if (!bValidPrefix)
-		{
-			FText PrefixError = FText::Format(
-				LOCTEXT("MissingPrefixError", "Required prefix: '{0}'."),
-				FText::FromString(MatchedPrefixData->Prefix)
-			);
-			ErrorMsg = FText::Join(FText::FromString(TEXT(" ")), ErrorMsg, PrefixError);
-		}
-
-		if (!bValidSuffix)
-		{
-			FText SuffixError = FText::Format(
-				LOCTEXT("MissingSuffixError", "Required suffix: '{0}'."),
-				FText::FromString(MatchedPrefixData->Suffix)
-			);
-			ErrorMsg = FText::Join(FText::FromString(TEXT(" ")), ErrorMsg, SuffixError);
-		}
-
-		AssetFails(InAsset, ErrorMsg);
-		return EDataValidationResult::Invalid;
-	}
-
-	AssetPasses(InAsset);
-	return EDataValidationResult::Valid;
+    AssetPasses(InAsset);
+    return EDataValidationResult::Valid;
 }
-
 #undef LOCTEXT_NAMESPACE

@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
 	"Version": 1,
-	"VersionName": "1.0",
+	"VersionName": "1.2",
 	"FriendlyName": "PrefixManager",
 	"Description": "",
 	"Category": "Other",
@@ -19,6 +19,12 @@
 			"Name": "PrefixManager",
 			"Type": "Editor",
 			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "DataValidation",
+			"Enabled": true
 		}
 	]
 }

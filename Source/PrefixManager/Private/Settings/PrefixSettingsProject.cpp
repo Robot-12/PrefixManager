@@ -8,6 +8,7 @@
 #include "BehaviorTree/BlackboardData.h"
 #include "Engine/Font.h"
 #include "Engine/UserDefinedEnum.h"
+#include "Factories/BlueprintFactory.h"
 #include "Materials/MaterialInstanceConstant.h"
 #include "Particles/ParticleSystem.h"
 #include "PhysicsEngine/PhysicsAsset.h"
@@ -170,4 +171,27 @@ const FPrefixClass* UPrefixSettingsProject::GetRuleForClass(const UClass* Target
 	}
 
 	return MatchedPrefixData;
+}
+
+void UPrefixSettingsProject::ResolveAssetClassAndType(UObject* ContextObject, const UClass* DefaultClass, const UClass*& OutAssetClass, const UClass*& OutClassType)
+{
+	OutAssetClass = DefaultClass;
+	OutClassType = DefaultClass;
+
+	if (OutClassType && OutClassType->IsChildOf(UWidgetBlueprint::StaticClass()))
+	{
+		OutClassType = UWidgetBlueprint::StaticClass();
+	}
+
+	if (ContextObject)
+	{
+		if (const UBlueprint* BP = Cast<UBlueprint>(ContextObject))
+		{
+			if (BP->ParentClass != nullptr) OutAssetClass = BP->ParentClass;
+		}
+		else if (const UBlueprintFactory* BPFactory = Cast<UBlueprintFactory>(ContextObject))
+		{
+			if (BPFactory->ParentClass != nullptr) OutAssetClass = BPFactory->ParentClass;
+		}
+	}
 }

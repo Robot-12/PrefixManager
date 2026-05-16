@@ -37,6 +37,8 @@ public:
 	void ResetToDefaults();
 
 	const FPrefixClass* GetRuleForClass(const UClass* TargetClass, const UClass* BaseClassType = nullptr) const;
+
+	static void ResolveAssetClassAndType(UObject* ContextObject, const UClass* DefaultClass, const UClass*& OutAssetClass, const UClass*& OutClassType);
 	
 	UPROPERTY(Config, EditAnywhere, Category = "Naming Convention")
 	TArray<FPrefixClass> Prefixes;
