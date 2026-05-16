@@ -28,9 +28,9 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "AutoPrefix | Live UI Validation", meta = (ToolTip = "Determines whether live UI validation (red tooltip and blocking Enter) is active."))
 	bool bEnableLiveUIValidation = true;
 
-	// AUTO-REPAIR TOGGLE: Automatically adds missing prefixes/suffixes when renaming.
-	UPROPERTY(Config, EditAnywhere, Category = "AutoPrefix | Auto Fix Renaming", meta = (ToolTip = "If enabled, renaming an asset without the required prefix/suffix will automatically append them. If disabled, incorrect renames are ignored."))
-	bool bEnableAutoFixRenaming = true;
+	// NAMING AUTO-CORRECTION: Automatically appends missing prefixes/suffixes upon asset finalization (creation, escape, or rename).
+	UPROPERTY(Config, EditAnywhere, Category = "AutoPrefix | Naming Policy", meta = (ToolTip = "If enabled, the plugin automatically ensures conventions are met by appending missing prefixes/suffixes whenever an asset is created, renamed, or when renaming is canceled via Escape. If disabled, naming non-conformities are ignored."))
+	bool bEnableNamingAutoCorrection = true;
 	
 	// VALIDATION TOGGLE: Disables local error checking when writing files.
 	UPROPERTY(Config, EditAnywhere, Category = "AutoPrefix | Data Validation (Save)", meta = (ToolTip = "Determines whether the Data Validation rules are enforced when saving assets."))

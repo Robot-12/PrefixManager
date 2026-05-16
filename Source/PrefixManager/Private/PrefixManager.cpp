@@ -46,8 +46,9 @@ void FPrefixManagerModule::StartupModule()
     
     if (FModuleManager::Get().IsModuleLoaded("AssetRegistry"))
     {
-        const FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
-        AssetRegistryModule.Get().OnAssetRenamed().AddRaw(this, &FPrefixManagerModule::HandleOnAssetRenamed);
+        IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
+        AssetRegistry.OnAssetRenamed().AddRaw(this, &FPrefixManagerModule::HandleOnAssetRenamed);
+        AssetRegistry.OnAssetAdded().AddRaw(this, &FPrefixManagerModule::HandleOnAssetAdded);
     }
 
     if (FSlateApplication::IsInitialized())
@@ -77,8 +78,9 @@ void FPrefixManagerModule::ShutdownModule()
     
     if (FModuleManager::Get().IsModuleLoaded("AssetRegistry"))
     {
-        const FAssetRegistryModule& AssetRegistryModule = FModuleManager::GetModuleChecked<FAssetRegistryModule>("AssetRegistry");
-        AssetRegistryModule.Get().OnAssetRenamed().RemoveAll(this);
+        IAssetRegistry& AssetRegistry = FModuleManager::GetModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
+        AssetRegistry.OnAssetRenamed().RemoveAll(this);
+        AssetRegistry.OnAssetAdded().RemoveAll(this);
     }
 
     if (FSlateApplication::IsInitialized())
@@ -88,7 +90,7 @@ void FPrefixManagerModule::ShutdownModule()
     
     if (FModuleManager::Get().IsModuleLoaded("PropertyEditor"))
     {
-        FPropertyEditorModule& PropertyModule = FModuleManager::GetModuleChecked<FPropertyEditorModule>("PropertyEditor");
+        FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
         PropertyModule.UnregisterCustomClassLayout("PrefixSettingsProject");
     }
 }
@@ -121,6 +123,9 @@ void FPrefixManagerModule::HandleOnFocusChanging(const FFocusEvent& FocusEvent, 
         {
             AssetClass = PendingAssetClass;
             ClassType = PendingClassType;
+            
+            PendingAssetClass = nullptr;
+            PendingClassType = nullptr;
         }
         else
         {
@@ -189,9 +194,6 @@ void FPrefixManagerModule::HandleOnFocusChanging(const FFocusEvent& FocusEvent, 
                 
                 return true; 
             }));
-
-            PendingAssetClass = nullptr;
-            PendingClassType = nullptr;
         }
 
         return false; 
@@ -229,7 +231,7 @@ void FPrefixManagerModule::HandleOnNewAssetCreated(UFactory* Factory)
            
            AssetToolsModule.Get().CreateUniqueAssetName(FullBaseName, TEXT(""), OutPackageName, OutAssetName);
            
-           AddSafeTicker([OutAssetName, EditorSettings](float DeltaTime) -> bool
+           AddSafeTicker([OutAssetName](float DeltaTime) -> bool
            {
                if (const TSharedPtr<SWidget> FocusedWidget = FSlateApplication::Get().GetKeyboardFocusedWidget(); FocusedWidget.IsValid())
                {
@@ -255,7 +257,25 @@ void FPrefixManagerModule::HandleOnNewAssetCreated(UFactory* Factory)
 
 void FPrefixManagerModule::HandleOnAssetRenamed(const FAssetData& AssetData, const FString& OldObjectPath)
 {
+    ExecuteNamingAutoCorrection(AssetData);
+}
+
+void FPrefixManagerModule::HandleOnAssetAdded(const FAssetData& AssetData)
+{
+    IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
+    if (AssetRegistry.IsLoadingAssets()) return;
+
+    ExecuteNamingAutoCorrection(AssetData);
+}
+
+void FPrefixManagerModule::ExecuteNamingAutoCorrection(const FAssetData& AssetData)
+{
     const FString CurrentObjectPath = AssetData.GetObjectPathString();
+
+    if (CurrentObjectPath.Contains(TEXT("RenameTmp")))
+    {
+        return;
+    }
     
     if (ActiveReverts.Contains(CurrentObjectPath))
     {
@@ -264,7 +284,7 @@ void FPrefixManagerModule::HandleOnAssetRenamed(const FAssetData& AssetData, con
     }
 
     const UPrefixSettingsEditor* EditorSettings = GetDefault<UPrefixSettingsEditor>();
-    if (EditorSettings && !EditorSettings->bEnableAutoFixRenaming) return;
+    if (EditorSettings && !EditorSettings->bEnableNamingAutoCorrection) return;
 
     if (AssetData.PackagePath.ToString().StartsWith(TEXT("/Engine/"))) return;
 
@@ -278,9 +298,7 @@ void FPrefixManagerModule::HandleOnAssetRenamed(const FAssetData& AssetData, con
     const UClass* ClassType = nullptr;
     UPrefixSettingsProject::ResolveAssetClassAndType(LoadedAsset, LoadedAsset->GetClass(), AssetClass, ClassType);
 
-    const FPrefixClass* MatchedPrefixData = ProjectSettings->GetRuleForClass(AssetClass, ClassType);
-    
-    if (MatchedPrefixData)
+    if (const FPrefixClass* MatchedPrefixData = ProjectSettings->GetRuleForClass(AssetClass, ClassType))
     {
         const FString NewName = AssetData.AssetName.ToString();
         const bool bValidPrefix = MatchedPrefixData->Prefix.IsEmpty() || NewName.StartsWith(MatchedPrefixData->Prefix);
