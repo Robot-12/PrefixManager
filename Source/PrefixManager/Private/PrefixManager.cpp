@@ -47,7 +47,6 @@ void FPrefixManagerModule::StartupModule()
     if (FModuleManager::Get().IsModuleLoaded("AssetRegistry"))
     {
         IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
-        AssetRegistry.OnAssetRenamed().AddRaw(this, &FPrefixManagerModule::HandleOnAssetRenamed);
         AssetRegistry.OnAssetAdded().AddRaw(this, &FPrefixManagerModule::HandleOnAssetAdded);
     }
 
@@ -79,7 +78,6 @@ void FPrefixManagerModule::ShutdownModule()
     if (FModuleManager::Get().IsModuleLoaded("AssetRegistry"))
     {
         IAssetRegistry& AssetRegistry = FModuleManager::GetModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
-        AssetRegistry.OnAssetRenamed().RemoveAll(this);
         AssetRegistry.OnAssetAdded().RemoveAll(this);
     }
 
@@ -101,8 +99,10 @@ void FPrefixManagerModule::HandleOnFocusChanging(const FFocusEvent& FocusEvent, 
     if (!EditorSettings || !EditorSettings->bEnableLiveUIValidation) return;
 
     if (!NewFocusedWidget.IsValid() || NewFocusedWidget->GetType() != FName("SEditableText")) return;
-    
-    AddSafeTicker([this, NewFocusedWidget](float DeltaTime) -> bool
+
+    int32 MaxRetries = 10;
+
+    AddSafeTicker([this, NewFocusedWidget, MaxRetries](float DeltaTime) mutable -> bool
     {
         if (!NewFocusedWidget.IsValid()) return false;
 
@@ -113,6 +113,7 @@ void FPrefixManagerModule::HandleOnFocusChanging(const FFocusEvent& FocusEvent, 
 
         const UClass* AssetClass = nullptr;
         const UClass* ClassType = nullptr;
+        bool bUsedGhost = false;
 
         if (SelectedAssets.Num() == 1) 
         {
@@ -123,9 +124,7 @@ void FPrefixManagerModule::HandleOnFocusChanging(const FFocusEvent& FocusEvent, 
         {
             AssetClass = PendingAssetClass;
             ClassType = PendingClassType;
-            
-            PendingAssetClass = nullptr;
-            PendingClassType = nullptr;
+            bUsedGhost = true;
         }
         else
         {
@@ -179,8 +178,8 @@ void FPrefixManagerModule::HandleOnFocusChanging(const FFocusEvent& FocusEvent, 
                 const UPrefixSettingsEditor* LiveSettings = GetDefault<UPrefixSettingsEditor>();
                 if (LiveSettings && !LiveSettings->bEnableLiveUIValidation) return true;
 
-                bool bValidPrefix = ExpectedPrefix.IsEmpty() || NewNameStr.StartsWith(ExpectedPrefix);
-                bool bValidSuffix = ExpectedSuffix.IsEmpty() || NewNameStr.EndsWith(ExpectedSuffix);
+                const bool bValidPrefix = ExpectedPrefix.IsEmpty() || NewNameStr.StartsWith(ExpectedPrefix);
+                const bool bValidSuffix = ExpectedSuffix.IsEmpty() || NewNameStr.EndsWith(ExpectedSuffix);
 
                 if (!bValidPrefix || !bValidSuffix)
                 {
@@ -194,8 +193,27 @@ void FPrefixManagerModule::HandleOnFocusChanging(const FFocusEvent& FocusEvent, 
                 
                 return true; 
             }));
+
+            if (bUsedGhost)
+            {
+                PendingAssetClass = nullptr;
+                PendingClassType = nullptr;
+            }
+
+            return false; 
+        }
+        
+        MaxRetries--;
+        if (MaxRetries > 0)
+        {
+            return true;
         }
 
+        if (bUsedGhost)
+        {
+            PendingAssetClass = nullptr;
+            PendingClassType = nullptr;
+        }
         return false; 
     });
 }
@@ -255,28 +273,20 @@ void FPrefixManagerModule::HandleOnNewAssetCreated(UFactory* Factory)
     }
 }
 
-void FPrefixManagerModule::HandleOnAssetRenamed(const FAssetData& AssetData, const FString& OldObjectPath)
-{
-    ExecuteNamingAutoCorrection(AssetData);
-}
-
 void FPrefixManagerModule::HandleOnAssetAdded(const FAssetData& AssetData)
 {
-    IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
+    const IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
     if (AssetRegistry.IsLoadingAssets()) return;
 
-    ExecuteNamingAutoCorrection(AssetData);
-}
-
-void FPrefixManagerModule::ExecuteNamingAutoCorrection(const FAssetData& AssetData)
-{
     const FString CurrentObjectPath = AssetData.GetObjectPathString();
-
-    if (CurrentObjectPath.Contains(TEXT("RenameTmp")))
+    
+    if (CurrentObjectPath.Contains(TEXT("RenameTmp")) || 
+        CurrentObjectPath.Contains(TEXT("_DELETED_")) || 
+        CurrentObjectPath.Contains(TEXT("TRASH_")))
     {
         return;
     }
-    
+
     if (ActiveReverts.Contains(CurrentObjectPath))
     {
         ActiveReverts.Remove(CurrentObjectPath);

@@ -25,7 +25,7 @@ public:
 	float AutoPrefixDelay = 0.1f;
 
 	// LIVE UI TOGGLE: Disables the red tooltip and Enter blocking when typing.
-	UPROPERTY(Config, EditAnywhere, Category = "AutoPrefix | Live UI Validation", meta = (ToolTip = "Determines whether live UI validation (red tooltip and blocking Enter) is active."))
+	UPROPERTY(Config, EditAnywhere, Category = "AutoPrefix | Live UI Validation", meta = (DisplayName = "Enable Live UI Validation", ToolTip = "Determines whether live UI validation (red tooltip and blocking Enter) is active."))
 	bool bEnableLiveUIValidation = true;
 
 	// NAMING AUTO-CORRECTION: Automatically appends missing prefixes/suffixes upon asset finalization (creation, escape, or rename).
