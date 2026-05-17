@@ -9,7 +9,7 @@
 #include "Widgets/Views/SHeaderRow.h"
 #include "Settings/PrefixSettingsProject.h"
 
-#define LOCTEXT_NAMESPACE "PrefixSettingsPlugin"
+#define LOCTEXT_NAMESPACE "PrefixManagerPlugin"
 
 DECLARE_DELEGATE_OneParam(FOnRowDeleted, const TSharedPtr<IPropertyHandle>&);
 

@@ -8,6 +8,7 @@
 #include "BehaviorTree/BlackboardData.h"
 #include "Engine/Font.h"
 #include "Engine/UserDefinedEnum.h"
+#include "Factories/BlueprintFactory.h"
 #include "Materials/MaterialInstanceConstant.h"
 #include "Particles/ParticleSystem.h"
 #include "PhysicsEngine/PhysicsAsset.h"
@@ -129,4 +130,68 @@ void UPrefixSettingsProject::ResetToDefaults()
 	Prefixes.Add(Rule);
 
 	SaveConfig();
+}
+
+const FPrefixClass* UPrefixSettingsProject::GetRuleForClass(const UClass* TargetClass, const UClass* BaseClassType) const
+{
+	const FPrefixClass* MatchedPrefixData = nullptr;
+	const UClass* CurrentClass = TargetClass;
+	bool bIsExactClass = true;
+
+	while (CurrentClass)
+	{
+		for (const FPrefixClass& PrefixClass : Prefixes)
+		{
+			if (PrefixClass.AssetClass == CurrentClass)
+			{
+				if (bIsExactClass || PrefixClass.bApplyToChildren)
+				{
+					MatchedPrefixData = &PrefixClass;
+					break;
+				}
+			}
+		}
+            
+		if (MatchedPrefixData) break;
+                
+		CurrentClass = CurrentClass->GetSuperClass();
+		bIsExactClass = false;
+	}
+
+	if (!MatchedPrefixData && BaseClassType)
+	{
+		for (const FPrefixClass& PrefixClass : Prefixes)
+		{
+			if (PrefixClass.AssetClass == BaseClassType)
+			{
+				MatchedPrefixData = &PrefixClass;
+				break;
+			}
+		}
+	}
+
+	return MatchedPrefixData;
+}
+
+void UPrefixSettingsProject::ResolveAssetClassAndType(UObject* ContextObject, const UClass* DefaultClass, const UClass*& OutAssetClass, const UClass*& OutClassType)
+{
+	OutAssetClass = DefaultClass;
+	OutClassType = DefaultClass;
+
+	if (OutClassType && OutClassType->IsChildOf(UWidgetBlueprint::StaticClass()))
+	{
+		OutClassType = UWidgetBlueprint::StaticClass();
+	}
+
+	if (ContextObject)
+	{
+		if (const UBlueprint* BP = Cast<UBlueprint>(ContextObject))
+		{
+			if (BP->ParentClass != nullptr) OutAssetClass = BP->ParentClass;
+		}
+		else if (const UBlueprintFactory* BPFactory = Cast<UBlueprintFactory>(ContextObject))
+		{
+			if (BPFactory->ParentClass != nullptr) OutAssetClass = BPFactory->ParentClass;
+		}
+	}
 }
